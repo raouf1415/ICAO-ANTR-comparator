@@ -18,7 +18,7 @@ except Exception:
     docx = None
 
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.neighbors import NearestNeighbors
 
 # --------- Utilities ---------
 CLAUSE_SPLIT_PATTERN = re.compile(
@@ -47,7 +47,22 @@ def read_any(uploaded) -> str:
     return raw.decode("utf-8", errors="ignore")
 
 def normalize_ws(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "")).strip()
+    """Normalize whitespace while preserving line breaks for clause splitting.
+
+    - Convert all line endings to "\n"
+    - Collapse horizontal whitespace (spaces, tabs) but keep newlines
+    - Trim each line and collapse excessive blank lines
+    """
+    s = (s or "")
+    # Normalize line endings
+    s = s.replace("\r\n", "\n").replace("\r", "\n")
+    # Collapse horizontal whitespace but preserve newlines
+    s = re.sub(r"[^\S\n]+", " ", s)
+    # Trim each line
+    s = "\n".join(line.strip() for line in s.split("\n"))
+    # Collapse multiple blank lines
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
 
 def split_clauses(text: str) -> List[Dict[str, Any]]:
     text = normalize_ws(text)
@@ -78,43 +93,75 @@ def split_clauses(text: str) -> List[Dict[str, Any]]:
     return chunks
 
 def align(src, tgt, min_sim=0.35, top_k=1) -> pd.DataFrame:
+    """Align clauses using TF-IDF + top-k cosine neighbors without building full matrix.
+
+    This avoids O(N*M) memory/time of a full similarity matrix and scales better.
+    """
     A_texts = [c["text"] for c in src]
     B_texts = [c["text"] for c in tgt]
     if not A_texts or not B_texts:
-        return pd.DataFrame(columns=["Source_ID","Source_Text","Matched_Target_ID","Matched_Target_Text","Similarity","Gap?"])
-    vec = TfidfVectorizer(ngram_range=(1,2))
+        return pd.DataFrame(columns=[
+            "Source_ID",
+            "Source_Text",
+            "Matched_Target_ID",
+            "Matched_Target_Text",
+            "Similarity",
+            "Gap?",
+        ])
+
+    vec = TfidfVectorizer(ngram_range=(1, 2))
     X = vec.fit_transform(A_texts + B_texts)
-    A = X[:len(A_texts)]
-    B = X[len(A_texts):]
-    sims = cosine_similarity(A, B)
+    A = X[: len(A_texts)]
+    B = X[len(A_texts) :]
+
+    # Use cosine distance (1 - cosine similarity). Supports sparse input with brute algorithm.
+    n_neighbors = min(max(1, top_k), B.shape[0])
+    nn = NearestNeighbors(n_neighbors=n_neighbors, metric="cosine", algorithm="brute")
+    nn.fit(B)
+    distances, indices = nn.kneighbors(A, return_distance=True)
+
     rows = []
     for i, sc in enumerate(src):
-        idxs = np.argsort(-sims[i])[:max(1, top_k)]
+        neighbor_idxs = indices[i]
+        neighbor_dists = distances[i]
         added = False
-        for j in idxs:
-            sim = float(sims[i, j])
+        for k, j in enumerate(neighbor_idxs):
+            sim = float(1.0 - neighbor_dists[k])
             if sim >= min_sim:
-                rows.append({
-                    "Source_ID": sc["id"],
-                    "Source_Text": sc["text"],
-                    "Matched_Target_ID": tgt[j]["id"],
-                    "Matched_Target_Text": tgt[j]["text"],
-                    "Similarity": round(sim, 4),
-                    "Gap?": "Aligned"
-                })
+                rows.append(
+                    {
+                        "Source_ID": sc["id"],
+                        "Source_Text": sc["text"],
+                        "Matched_Target_ID": tgt[int(j)]["id"],
+                        "Matched_Target_Text": tgt[int(j)]["text"],
+                        "Similarity": round(sim, 4),
+                        "Gap?": "Aligned",
+                        "_Source_Order": i,
+                    }
+                )
                 added = True
         if not added:
-            j = int(np.argmax(sims[i]))
-            sim = float(sims[i, j])
-            rows.append({
-                "Source_ID": sc["id"],
-                "Source_Text": sc["text"],
-                "Matched_Target_ID": tgt[j]["id"],
-                "Matched_Target_Text": tgt[j]["text"],
-                "Similarity": round(sim, 4),
-                "Gap?": "Potential Gap"
-            })
-    df = pd.DataFrame(rows).sort_values(["Source_ID","Similarity"], ascending=[True, False]).reset_index(drop=True)
+            j0 = int(neighbor_idxs[0])
+            sim0 = float(1.0 - neighbor_dists[0])
+            rows.append(
+                {
+                    "Source_ID": sc["id"],
+                    "Source_Text": sc["text"],
+                    "Matched_Target_ID": tgt[j0]["id"],
+                    "Matched_Target_Text": tgt[j0]["text"],
+                    "Similarity": round(sim0, 4),
+                    "Gap?": "Potential Gap",
+                    "_Source_Order": i,
+                }
+            )
+
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df = (
+            df.sort_values(["_Source_Order", "Similarity"], ascending=[True, False])
+            .drop(columns=["_Source_Order"])  # keep original source order
+            .reset_index(drop=True)
+        )
     return df
 
 def to_excel_bytes(df: pd.DataFrame) -> bytes:
@@ -122,14 +169,18 @@ def to_excel_bytes(df: pd.DataFrame) -> bytes:
     from openpyxl.utils import get_column_letter
     from openpyxl.styles import PatternFill
     out = io.BytesIO()
+    # Ensure index is simple integer to avoid Excel writer issues on strange indexes
+    df_to_write = df.reset_index(drop=True)
     with pd.ExcelWriter(out, engine="openpyxl") as w:
-        df.to_excel(w, index=False, sheet_name="Matrix")
+        df_to_write.to_excel(w, index=False, sheet_name="Matrix")
         ws = w.sheets["Matrix"]
-        for i, _ in enumerate(df.columns, start=1):
+        for i, _ in enumerate(df_to_write.columns, start=1):
             ws.column_dimensions[get_column_letter(i)].width = 24
-        gap_fill = PatternFill(start_color="FFF3CD", end_color="FFF3CD", fill_type="solid")
+        # Use ARGB 8-digit color code for compatibility with openpyxl
+        gap_fill = PatternFill(start_color="FFFFF3CD", end_color="FFFFF3CD", fill_type="solid")
+        gap_idx = df_to_write.columns.get_loc("Gap?") if "Gap?" in df_to_write.columns else None
         for r in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-            if r[df.columns.get_loc("Gap?")].value == "Potential Gap":
+            if gap_idx is not None and r[gap_idx].value == "Potential Gap":
                 for cell in r:
                     cell.fill = gap_fill
     return out.getvalue()
@@ -160,7 +211,11 @@ if src_file and tgt_file:
 
         if split_hint.strip():
             try:
-                CLAUSE_SPLIT_PATTERN = re.compile(split_hint, re.IGNORECASE | re.MULTILINE)
+                # Anchor custom hint to start-of-line by default to avoid catastrophic backtracking
+                hint = split_hint
+                if not hint.startswith("^"):
+                    hint = r"^" + hint
+                CLAUSE_SPLIT_PATTERN = re.compile(hint, re.IGNORECASE | re.MULTILINE)
             except re.error as ex:
                 st.warning(f"Ignoring invalid regex: {ex}")
 
