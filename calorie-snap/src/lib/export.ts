@@ -1,4 +1,4 @@
-import { HistoryEntry } from '../types';
+import type { HistoryEntry } from '../types';
 
 export function exportToCSV(entries: HistoryEntry[]): string {
   const headers = [

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Minus, Plus, Scale } from 'lucide-react';
-import { PortionData } from '../types';
+import type { PortionData } from '../types';
 
 interface PortionPickerProps {
   initialPortion: PortionData;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { exportToCSV, downloadCSV, formatDate, formatTime } from '../lib/export';
-import { HistoryEntry } from '../types';
+import type { HistoryEntry } from '../types';
 
 // Mock URL.createObjectURL and URL.revokeObjectURL
 global.URL.createObjectURL = vi.fn(() => 'mock-url');

@@ -1,4 +1,4 @@
-import { NutritionData } from '../types';
+import type { NutritionData } from '../types';
 
 // Local food database for fallback when APIs are unavailable
 const LOCAL_FOOD_DB: Record<string, NutritionData> = {

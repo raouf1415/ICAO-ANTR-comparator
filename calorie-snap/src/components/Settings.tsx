@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppSettings } from '../types';
+import type { AppSettings } from '../types';
 import { Key, Camera, Save, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 
 interface SettingsProps {

@@ -1,7 +1,8 @@
 import * as tf from '@tensorflow/tfjs';
-import { FoodPrediction } from '../types';
+import type { FoodPrediction } from '../types';
 
-// Food-101 class labels (simplified subset for demo)
+// Food-101 class labels (simplified subset for demo) - unused for now
+/*
 const FOOD_LABELS = [
   'apple_pie', 'baby_back_ribs', 'baklava', 'beef_carpaccio', 'beef_tartare',
   'beet_salad', 'beignets', 'bibimbap', 'bread_pudding', 'breakfast_burrito',
@@ -24,6 +25,7 @@ const FOOD_LABELS = [
   'spring_rolls', 'steak', 'strawberry_shortcake', 'sushi', 'tacos',
   'takoyaki', 'tiramisu', 'tuna_tartare', 'waffles'
 ];
+*/
 
 // Map model labels to human-readable names
 const LABEL_MAP: Record<string, string> = {
@@ -174,7 +176,7 @@ export async function predictFood(imageElement: HTMLImageElement): Promise<FoodP
 
     // Get predictions
     const predictions = model.predict(tensor) as tf.Tensor;
-    const predictionArray = await predictions.data();
+    // const predictionArray = await predictions.data(); // Unused for now
 
     // Convert to FoodPrediction objects
     const results: FoodPrediction[] = [];

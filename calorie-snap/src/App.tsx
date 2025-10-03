@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, AppScreen, FoodPrediction, HistoryEntry, AppSettings, PortionData } from './types';
+import type { AppState, AppScreen, FoodPrediction, HistoryEntry, AppSettings, PortionData } from './types';
 import { CameraCapture } from './components/CameraCapture';
 import { FoodSuggestions } from './components/FoodSuggestions';
 import { PortionPicker } from './components/PortionPicker';
@@ -12,7 +12,7 @@ import { predictFood } from './lib/tfModel';
 import { getNutrition, calculateCalories, calculateMacros } from './lib/nutrition';
 import { saveHistoryEntry, getHistoryEntries, deleteHistoryEntry, clearHistory, initDB } from './lib/db';
 import { exportToCSV, downloadCSV } from './lib/export';
-import { Home, History, Settings as SettingsIcon, ArrowLeft, Camera } from 'lucide-react';
+import { History, Settings as SettingsIcon, ArrowLeft, Camera } from 'lucide-react';
 
 // Default settings
 const defaultSettings: AppSettings = {
@@ -191,7 +191,6 @@ const useAppStore = create<AppState>()(
 export const App: React.FC = () => {
   const {
     currentScreen,
-    capturedImage,
     predictions,
     selectedFood,
     portionData,
@@ -209,7 +208,6 @@ export const App: React.FC = () => {
     deleteHistoryEntry,
     clearAllHistory,
     exportHistory,
-    resetApp,
     setError
   } = useAppStore();
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { HistoryEntry } from '../types';
+import type { HistoryEntry } from '../types';
 import { Search, Download, Trash2, Calendar, Flame, Eye } from 'lucide-react';
 import { formatDate, formatTime } from '../lib/export';
 

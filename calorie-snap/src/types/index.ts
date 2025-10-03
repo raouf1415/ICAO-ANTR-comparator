@@ -56,4 +56,27 @@ export interface AppState {
   settings: AppSettings;
   isLoading: boolean;
   error: string | null;
+  
+  // Actions
+  setCurrentScreen: (screen: AppScreen) => void;
+  setCapturedImage: (image: string | null) => void;
+  setPredictions: (predictions: FoodPrediction[]) => void;
+  setSelectedFood: (food: FoodPrediction | null) => void;
+  setPortionData: (portion: PortionData) => void;
+  setNutritionData: (nutrition: NutritionData | null) => void;
+  setHistory: (history: HistoryEntry[]) => void;
+  setSettings: (settings: AppSettings) => void;
+  setIsLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  
+  // Complex actions
+  capturePhoto: (imageDataUrl: string) => Promise<void>;
+  selectFood: (food: FoodPrediction) => void;
+  getNutritionData: (foodName: string) => Promise<void>;
+  saveToHistory: () => Promise<void>;
+  loadHistory: () => Promise<void>;
+  deleteHistoryEntry: (id: string) => Promise<void>;
+  clearAllHistory: () => Promise<void>;
+  exportHistory: () => void;
+  resetApp: () => void;
 }

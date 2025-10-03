@@ -1,5 +1,5 @@
 import React from 'react';
-import { FoodPrediction } from '../types';
+import type { FoodPrediction } from '../types';
 import { CheckCircle, AlertCircle, Search } from 'lucide-react';
 
 interface FoodSuggestionsProps {
@@ -123,7 +123,7 @@ export const FoodSuggestions: React.FC<FoodSuggestionsProps> = ({
         </h3>
         
         <div className="space-y-3 mb-4">
-          {predictions.map((prediction, index) => (
+          {predictions.map((prediction) => (
             <button
               key={prediction.label}
               onClick={() => onSelectFood(prediction)}

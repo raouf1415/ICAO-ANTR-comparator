@@ -1,5 +1,5 @@
 import React from 'react';
-import { FoodPrediction, NutritionData, PortionData } from '../types';
+import type { FoodPrediction, NutritionData, PortionData } from '../types';
 import { Flame, Zap, Target, Award, Save, Share2 } from 'lucide-react';
 
 interface ResultCardProps {

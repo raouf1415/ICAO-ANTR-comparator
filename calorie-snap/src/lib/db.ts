@@ -1,5 +1,6 @@
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { HistoryEntry } from '../types';
+import { openDB } from 'idb';
+import type { DBSchema, IDBPDatabase } from 'idb';
+import type { HistoryEntry } from '../types';
 
 interface CalorieSnapDB extends DBSchema {
   history: {
