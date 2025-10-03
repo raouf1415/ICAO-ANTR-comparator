@@ -27,9 +27,19 @@ CLAUSE_SPLIT_PATTERN = re.compile(
 )
 
 def read_any(uploaded) -> str:
+    # Security: Validate file size (limit to 50MB)
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+    if uploaded.size > MAX_FILE_SIZE:
+        raise ValueError(f"File too large. Maximum size allowed is {MAX_FILE_SIZE // (1024*1024)}MB")
+    
     name = uploaded.name.lower()
     raw = uploaded.read()
     uploaded.seek(0)
+    
+    # Security: Validate file extension more strictly
+    if not name.endswith((".txt", ".pdf", ".docx")):
+        raise ValueError(f"Unsupported file type: {uploaded.name}. Only .txt, .pdf, and .docx files are allowed.")
+    
     if name.endswith(".txt"):
         return raw.decode("utf-8", errors="ignore")
     if name.endswith(".pdf"):
@@ -82,10 +92,12 @@ def align(src, tgt, min_sim=0.35, top_k=1) -> pd.DataFrame:
     B_texts = [c["text"] for c in tgt]
     if not A_texts or not B_texts:
         return pd.DataFrame(columns=["Source_ID","Source_Text","Matched_Target_ID","Matched_Target_Text","Similarity","Gap?"])
+    
+    # More efficient: fit on combined vocabulary, then transform separately
     vec = TfidfVectorizer(ngram_range=(1,2))
-    X = vec.fit_transform(A_texts + B_texts)
-    A = X[:len(A_texts)]
-    B = X[len(A_texts):]
+    vec.fit(A_texts + B_texts)  # Learn vocabulary from both documents
+    A = vec.transform(A_texts)  # Transform source document
+    B = vec.transform(B_texts)  # Transform target document
     sims = cosine_similarity(A, B)
     rows = []
     for i, sc in enumerate(src):
@@ -154,12 +166,17 @@ if src_file and tgt_file:
         try:
             src_text = read_any(src_file)
             tgt_text = read_any(tgt_file)
+        except ValueError as e:
+            st.error(f"File validation error: {e}")
+            st.stop()
         except Exception as e:
             st.error(f"File read error: {e}")
             st.stop()
 
+        # Apply custom regex pattern if provided
         if split_hint.strip():
             try:
+                global CLAUSE_SPLIT_PATTERN
                 CLAUSE_SPLIT_PATTERN = re.compile(split_hint, re.IGNORECASE | re.MULTILINE)
             except re.error as ex:
                 st.warning(f"Ignoring invalid regex: {ex}")
